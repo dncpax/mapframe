@@ -117,6 +117,63 @@ L.geoJSON(myGeoJSON, {
 
 }).addTo(map);
 
+
+
+/*gestor de comms com a parent*/
+  addEventListener("message", e => {
+    if (e.source !== parent) return;
+
+    const msg = e.data;
+    if (!msg?.type || !msg.id) return;
+
+    const response = { id: msg.id, ok: true };
+
+    const handlers = {
+        addPoint: (p) => {
+            if (!p?.lat || !p?.lng) throw new Error("missing lat/lng");
+            console.log("→ add point", p.lat, p.lng);
+            // map.addPoint(p);
+        },
+
+        refreshGeoJSON: (geojson) => {
+            if (geojson?.type !== "FeatureCollection") throw new Error("not FeatureCollection");
+            console.log("→ refresh geojson", geojson.features.length, "features");
+            // updateMap(geojson);
+        },
+
+        clear: () => {
+            console.log("→ clear map");
+            // map.clear();
+        },
+
+        setView: ({lat, lng, zoom = 13}) => {
+            if (lat == null || lng == null) throw new Error("missing lat/lng");
+            console.log("→ set view", lat, lng, "zoom", zoom);
+            // map.setView([lat, lng], zoom);
+        },
+
+        ping: () => {
+            // nothing extra needed
+        }
+    };
+
+    try {
+        const handler = handlers[msg.type];
+        if (!handler) {
+            response.ok = false;
+            response.error = `Unknown command: ${msg.type}`;
+        } else {
+            handler(msg.payload);
+        }
+    } catch (err) {
+        response.ok = false;
+        response.error = err.message;
+    }
+
+    parent.postMessage(response, "*");
+  });
+
 </script>
+
 </body>
 </html>
