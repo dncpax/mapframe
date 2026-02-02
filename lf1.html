@@ -30,54 +30,44 @@
 //  Your GeoJSON – put whatever you want here
 // ────────────────────────────────────────────────
 const myGeoJSON = {
-  "type": "FeatureCollection",
-  "features": [
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Central Park",
-        "popupContent": "Central Park, New York"
-      },
-      "geometry": {
-        "type": "Polygon",
-        "coordinates": [[
-          [-73.981, 40.768],
-          [-73.958, 40.800],
-          [-73.949, 40.796],
-          [-73.973, 40.764],
-          [-73.981, 40.768]
-        ]]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Statue of Liberty",
-        "popupContent": "Liberty Island"
-      },
-      "geometry": {
-        "type": "Point",
-        "coordinates": [-74.0445, 40.6892]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Brooklyn Bridge",
-        "stroke": "#ff6600",
-        "stroke-width": 5
-      },
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [-73.9969, 40.7060],
-          [-73.9960, 40.7025],
-          [-73.9942, 40.7038]
-        ]
-      }
+    "geojson": {
+      "type": "FeatureCollection",
+      "features": [
+        {
+          "type": "Feature",
+          "geometry": {
+            "type": "Point",
+            "coordinates": [
+              -9.446624912,
+              38.568234763
+            ]
+          },
+          "properties": {
+            "id": 1,
+            "name": "Ponto 0001",
+            "category": "escritorio",
+            "created_at": "2026-02-01T17:53:26.89577+00:00"
+          }
+        },
+        {
+          "type": "Feature",
+          "geometry": {
+            "type": "Point",
+            "coordinates": [
+              -7.785630179,
+              39.55998344
+            ]
+          },
+          "properties": {
+            "id": 2,
+            "name": "Ponto 0002",
+            "category": "escritorio",
+            "created_at": "2026-02-01T17:53:26.89577+00:00"
+          }
+        }
+      ]
     }
-  ]
-};
+  };
 
 // ────────────────────────────────────────────────
 //  Map setup
