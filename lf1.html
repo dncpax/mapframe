@@ -121,7 +121,6 @@ L.geoJSON(myGeoJSON, {
 
 /*gestor de comms com a parent*/
   addEventListener("message", e => {
-    console.log('source:' + e.source);
     console.log('data:' + e.data);
     if (e.source !== parent) return;
 
