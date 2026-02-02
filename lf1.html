@@ -82,7 +82,7 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
 // ────────────────────────────────────────────────
 //  Add the GeoJSON layer
 // ────────────────────────────────────────────────
-L.geoJSON(myGeoJSON, {
+const geoJsonLayer = L.geoJSON(myGeoJSON, {
 
   // Style function (you can also use an object)
   style: function(feature) {
@@ -133,7 +133,21 @@ L.geoJSON(myGeoJSON, {
         addPoint: (p) => {
             if (!p?.lat || !p?.lng) throw new Error("missing lat/lng");
             console.log("→ add point", p.lat, p.lng);
-            // map.addPoint(p);
+            const nFeatures = geoJsonLayer.getLayers().length;
+             // This is the key line: add one Feature to the existing layer
+            geoJsonLayer.addData({
+              type: "Feature",
+              geometry: {
+                type: "Point",
+                coordinates: [p.lng, p.lat]          // GeoJSON = [lng, lat] !!!
+              },
+              properties: {
+                id: 9000 + nFeatures +1,
+                name: "Ponto " + String(9000 + nFeatures +1).padStart(6, '0'),
+                category: "escritorio",
+                created_at: new Date().toISOString().replace('Z', '+00:00')
+              }
+            });
         },
 
         refreshGeoJSON: (geojson) => {
