@@ -153,7 +153,8 @@ const geoJsonLayer = L.geoJSON(myGeoJSON, {
         refreshGeoJSON: (geojson) => {
             if (geojson?.type !== "FeatureCollection") throw new Error("not FeatureCollection");
             console.log("→ refresh geojson", geojson.features.length, "features");
-            // updateMap(geojson);
+            geoJsonLayer.clearLayers();          // removes all old features
+            geoJsonLayer.addData(geojson);
         },
 
         clear: () => {
