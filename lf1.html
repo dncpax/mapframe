@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Leaflet + GeoJSON from variable</title>
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" 
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5n/N0RDwH4=" 
+        crossorigin=""/>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" 
+          crossorigin=""></script>
+
+  <style>
+    html, body {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+    }
+    #map {
+      height: 100%;
+    }
+  </style>
+</head>
+<body>
+
+<div id="map"></div>
+
+<script>
+// ────────────────────────────────────────────────
+//  Your GeoJSON – put whatever you want here
+// ────────────────────────────────────────────────
+const myGeoJSON = {
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Central Park",
+        "popupContent": "Central Park, New York"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [-73.981, 40.768],
+          [-73.958, 40.800],
+          [-73.949, 40.796],
+          [-73.973, 40.764],
+          [-73.981, 40.768]
+        ]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Statue of Liberty",
+        "popupContent": "Liberty Island"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-74.0445, 40.6892]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Brooklyn Bridge",
+        "stroke": "#ff6600",
+        "stroke-width": 5
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [-73.9969, 40.7060],
+          [-73.9960, 40.7025],
+          [-73.9942, 40.7038]
+        ]
+      }
+    }
+  ]
+};
+
+// ────────────────────────────────────────────────
+//  Map setup
+// ────────────────────────────────────────────────
+const map = L.map('map').setView([40.7128, -74.0060], 12);
+
+// Nice free tiles
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  maxZoom: 19,
+  attribution: '© OpenStreetMap'
+}).addTo(map);
+
+
+// ────────────────────────────────────────────────
+//  Add the GeoJSON layer
+// ────────────────────────────────────────────────
+L.geoJSON(myGeoJSON, {
+
+  // Style function (you can also use an object)
+  style: function(feature) {
+    return {
+      color: feature.properties.stroke || "#3388ff",
+      weight: feature.properties["stroke-width"] || 3,
+      opacity: 0.85,
+      fillOpacity: 0.2
+    };
+  },
+
+  // Point styling
+  pointToLayer: function(feature, latlng) {
+    return L.circleMarker(latlng, {
+      radius: 8,
+      fillColor: "#e74c3c",
+      color: "#fff",
+      weight: 2,
+      opacity: 1,
+      fillOpacity: 0.9
+    });
+  },
+
+  // Popup for every feature that has properties
+  onEachFeature: function(feature, layer) {
+    if (feature.properties && feature.properties.popupContent) {
+      layer.bindPopup(feature.properties.popupContent);
+    } else if (feature.properties && feature.properties.name) {
+      layer.bindPopup(feature.properties.name);
+    }
+  }
+
+}).addTo(map);
+
+</script>
+</body>
+</html>
