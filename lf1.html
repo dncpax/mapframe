@@ -173,7 +173,7 @@ function zoomAndHighlightById(id, options = {}) {
   // 1. Find the layer by id
   let targetLayer = null;
 
-  geojsonLayer.eachLayer(layer => {
+  geoJsonLayer.eachLayer(layer => {
     const layerId = layer.feature?.id || layer.feature?.properties?.id || layer._customId;
     if (layerId == id) {           // == so it works with numbers & strings
       targetLayer = layer;
