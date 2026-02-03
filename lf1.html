@@ -122,9 +122,15 @@ const geoJsonLayer = L.geoJSON(myGeoJSON, {
 
 // add Leaflet-Geoman controls with some options to the map  
 map.pm.addControls({  
-  position: 'topleft',  
   drawCircleMarker: false,
   rotateMode: false,
+  drawCircle: false,       // customize toolbar
+  drawMarker: true,
+  drawPolygon: true,
+  drawPolyline: false,
+  editMode: true,
+  dragMode: true,
+  removalMode: true
 }); 
 
 /*gestor de comms com a parent*/
