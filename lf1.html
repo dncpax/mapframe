@@ -133,7 +133,113 @@ map.pm.addControls({
   removalMode: true
 }); 
 
-/*gestor de comms com a parent*/
+
+/*
+** GESTOR DE HIGHLIGHT DA SELECAO DE 1 REC
+**
+**
+*/
+// Define your highlight styles
+const HIGHLIGHT_STYLE = {
+  // For polygons / lines
+  color: '#00FFFF',     // cyan outline
+  weight: 5,
+  opacity: 1,
+  fillColor: '#FFFF00', // yellow fill
+  fillOpacity: 0.5
+};
+
+const HIGHLIGHT_POINT_STYLE = {
+  radius: 12,
+  fillColor: '#FFFF00',     // yellow interior
+  color: '#00FFFF',         // cyan outline
+  weight: 5,
+  opacity: 1,
+  fillOpacity: 0.9
+};
+
+// Optional: remember original style to restore later
+let previouslyHighlighted = null;
+
+function zoomAndHighlightById(id, options = {}) {
+  const {
+    zoomLevel = 16,           // for points — adjust as needed
+    padding = [60, 60],       // pixels — gives some breathing room
+    maxZoom = 18,
+    duration = 1.2,           // flyTo animation duration (seconds)
+    restorePrevious = true    // reset old highlight?
+  } = options;
+
+  // 1. Find the layer by id
+  let targetLayer = null;
+
+  geojsonLayer.eachLayer(layer => {
+    const layerId = layer.feature?.id || layer.feature?.properties?.id || layer._customId;
+    if (layerId == id) {           // == so it works with numbers & strings
+      targetLayer = layer;
+    }
+  });
+
+  if (!targetLayer) {
+    console.warn(`Feature with id ${id} not found`);
+    return;
+  }
+
+  // 2. Optional: reset previous highlight
+  if (restorePrevious && previouslyHighlighted) {
+    // restore original style
+    if (previouslyHighlighted.setStyle) {
+      previouslyHighlighted.setStyle(previouslyHighlighted.options.origStyle || {});
+    } else if (previouslyHighlighted.setRadius) {
+      // circle marker
+      previouslyHighlighted.setRadius(previouslyHighlighted.options.origRadius || 6);
+      previouslyHighlighted.setStyle(previouslyHighlighted.options.origStyle || {});
+    }
+    previouslyHighlighted = null;
+  }
+
+  // 3. Apply highlight style
+  if (targetLayer instanceof L.CircleMarker || targetLayer instanceof L.Marker) {
+    // Points
+    if (!targetLayer.options.origStyle) {
+      targetLayer.options.origStyle = { ...targetLayer.options };
+      targetLayer.options.origRadius = targetLayer.options.radius;
+    }
+    targetLayer.setStyle(HIGHLIGHT_POINT_STYLE);
+  } else {
+    // Polygon / Polyline
+    if (!targetLayer.options.origStyle) {
+      targetLayer.options.origStyle = { ...targetLayer.options };
+    }
+    targetLayer.setStyle(HIGHLIGHT_STYLE);
+  }
+
+  previouslyHighlighted = targetLayer;
+
+  // 4. Zoom / fly to the feature
+  if (targetLayer.getBounds) {
+    // Polygon / Line / Multi*
+    map.flyToBounds(targetLayer.getBounds(), {
+      paddingTopLeft: padding,
+      paddingBottomRight: padding,
+      duration,
+      maxZoom
+    });
+  } else if (targetLayer.getLatLng) {
+    // Point (circleMarker or marker)
+    map.flyTo(targetLayer.getLatLng(), zoomLevel, {
+      duration,
+      animate: true
+    });
+  }
+}
+
+
+/*
+** GESTOR de comms com a parent
+**
+**
+*/
   addEventListener("message", e => {
     console.log('data:' + e.data);
     if (e.source !== parent) return;
@@ -144,6 +250,9 @@ map.pm.addControls({
     const response = { id: msg.id, ok: true };
 
     const handlers = {
+        zoomToPoint: (data) =>{
+          zoomAndHighlightById(data.idrec);
+        },
         addPoint: (p) => {
             if (!p?.lat || !p?.lng) throw new Error("missing lat/lng");
             console.log("→ add point", p.lat, p.lng);
