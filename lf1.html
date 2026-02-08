@@ -133,6 +133,27 @@ map.pm.addControls({
   removalMode: true
 }); 
 
+// ────────────────────────────────────────────────
+// When the map has finished its initial load → notify parent
+// ────────────────────────────────────────────────
+map.whenReady(() => {
+  // You can also use map.on('load', ...) — whenReady() is usually cleaner
+  const readyMessage = {
+    type: 'leaflet-ready',
+    // optional useful info
+    center: map.getCenter(),
+    zoom: map.getZoom(),
+    timestamp: Date.now()
+  };
+
+  // Send to parent
+  // Use specific targetOrigin instead of '*' in production!
+  window.parent.postMessage(readyMessage, '*');  
+  // Better (safer): window.parent.postMessage(readyMessage, 'https://your-parent-domain.com');
+
+  console.log('Map is ready — sent notification to parent');
+});
+
 
 /*
 ** GESTOR DE HIGHLIGHT DA SELECAO DE 1 REC
