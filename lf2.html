@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Leaflet Map – Editable</title>
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" 
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5n/N0ZDv4=" crossorigin=""/>
+  <link rel="stylesheet" href="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.css"/>
+
+  <style>
+    html, body, #map { height: 100%; margin: 0; padding: 0; }
+    #mode-banner {
+      position: absolute;
+      top: 10px; left: 50%; transform: translateX(-50%);
+      background: #3338; color: white; padding: 6px 14px;
+      border-radius: 4px; font-family: sans-serif; z-index: 1000;
+      display: none; pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+
+<div id="map"></div>
+<div id="mode-banner"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.min.js"></script>
+
+<script>
+// ────────────────────────────────────────────────
+// Globals & layers
+let map;
+let editableGroup     = L.featureGroup();
+let polygonLayer     = L.geoJSON(null, { style: polyStyle }).addTo(editableGroup);
+let pointLayer       = L.geoJSON(null, {
+  pointToLayer: (f, latlng) => L.circleMarker(latlng, { radius: 7, fillColor: "#ff7800", color: "#000", weight: 1, opacity: 1, fillOpacity: 0.8 })
+}).addTo(editableGroup);
+
+let selectedFeatureId = null;
+let editOnlyGeometry  = false;   // when true → hide attribute form prompt, only geometry
+
+const DEBOUNCE_MS = 900;
+
+// ────────────────────────────────────────────────
+function polyStyle(feature) {
+  return {
+    color: "#3388ff",
+    weight: 3,
+    opacity: 0.85,
+    fillOpacity: 0.15
+  };
+}
+
+// ────────────────────────────────────────────────
+function initMap() {
+  map = L.map('map', {
+    center: [51.505, -0.09],
+    zoom: 13,
+    pmIgnore: false   // important for Geoman
+  });
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap'
+  }).addTo(map);
+
+  editableGroup.addTo(map);
+
+  // Geoman controls (we'll enable/disable tools dynamically)
+  map.pm.addControls({
+    position: 'topleft',
+    drawMarker:      false,   // controlled manually
+    drawPolygon:     false,
+    drawCircle:      false,
+    drawRectangle:   false,
+    drawPolyline:    false,
+    editMode:        false,
+    dragMode:        false,
+    removalMode:     false,
+    cutPolygon:      false
+  });
+
+  // ── Listen for geometry changes ──────────────────────────────
+  editableGroup.on('pm:dragend pm:markerdragend pm:vertex:changed', debounceSendGeometry);
+
+  // Optional: catch final save / mode exit
+  map.on('pm:globaleditmodetoggled', e => {
+    if (!e.enabled) {
+      send({ action: 'edit:stopped' });
+    }
+  });
+
+  // ── Forward feature clicks to parent ─────────────────────────
+  editableGroup.on('click', e => {
+    const fid = e.layer?.feature?.id || e.layer?.feature?.properties?.id;
+    if (fid) {
+      send({ action: 'feature:click', id: fid });
+    }
+  });
+}
+
+// ────────────────────────────────────────────────
+function debounceSendGeometry() {
+  clearTimeout(window.geoDebounce);
+  window.geoDebounce = setTimeout(() => {
+    const fc = {
+      type: "FeatureCollection",
+      features: editableGroup.toGeoJSON().features
+    };
+    send({ action: 'geometry:changed', geojson: fc });
+  }, DEBOUNCE_MS);
+}
+
+// ────────────────────────────────────────────────
+function send(msg) {
+  // Very important: target real parent origin in production!
+  window.parent.postMessage(msg, '*');   // ← change to exact origin later
+}
+
+// ────────────────────────────────────────────────
+// Message handler from parent
+window.addEventListener('message', function(e) {
+  // In production → if (e.origin !== 'https://your-app.com') return;
+
+  const data = e.data;
+  if (!data || !data.action) return;
+
+  switch (data.action) {
+
+    case 'load:geojson': {
+      // Expect { points?: GeoJSON, polygons?: GeoJSON }
+      if (data.points) {
+        pointLayer.clearLayers().addData(data.points);
+      }
+      if (data.polygons) {
+        polygonLayer.clearLayers().addData(data.polygons);
+      }
+      if (data.fit) {
+        editableGroup.getBounds().isValid() && map.fitBounds(editableGroup.getBounds(), { padding: [40,40] });
+      }
+      break;
+    }
+
+    case 'select:feature': {
+      const id = data.id;
+      selectedFeatureId = id;
+      editOnlyGeometry  = !!data.geometryOnly;
+
+      // Reset previous
+      editableGroup.eachLayer(l => {
+        l.pm?.disable?.();
+        l.setStyle({ className: '' });   // remove highlight
+      });
+
+      let targetLayer = null;
+      editableGroup.eachLayer(layer => {
+        const fid = layer.feature?.id || layer.feature?.properties?.id;
+        if (fid === id) {
+          targetLayer = layer;
+        }
+      });
+
+      if (targetLayer) {
+        // Highlight
+        targetLayer.setStyle({ className: 'selected-feature-glow' });
+
+        // Zoom
+        if (targetLayer.getBounds) {
+          map.fitBounds(targetLayer.getBounds(), { padding: [60,60], maxZoom: 17 });
+        } else if (targetLayer.getLatLng) {
+          map.setView(targetLayer.getLatLng(), 17);
+        }
+
+        // Enter edit mode only for this layer
+        targetLayer.pm?.enable?.({
+          allowSelfIntersection: false,
+          preventMarkerRemoval: false,
+          hideMiddleMarkers: false
+        });
+
+        // Show banner
+        const banner = document.getElementById('mode-banner');
+        banner.textContent = editOnlyGeometry
+          ? "Repositioning – drag handles • Esc to cancel"
+          : "Editing feature – modify shape & save in form";
+        banner.style.display = 'block';
+
+        send({ action: 'feature:selected', id });
+      }
+      break;
+    }
+
+    case 'edit:stop': {
+      editableGroup.eachLayer(l => l.pm?.disable?.());
+      document.getElementById('mode-banner').style.display = 'none';
+      selectedFeatureId = null;
+      send({ action: 'edit:stopped' });
+      break;
+    }
+
+    case 'enable:draw:marker':
+      map.pm.Draw.Marker.enable();
+      break;
+
+    case 'enable:draw:polygon':
+      map.pm.Draw.Polygon.enable();
+      break;
+
+    // ... you can add more draw types
+
+    case 'disable:draw':
+      map.pm.Draw.disable();
+      break;
+  }
+});
+
+// ── New feature created ───────────────────────────────────────
+map.on('pm:create', e => {
+  const layer = e.layer;
+  const type  = e.shape;
+
+  // Give it an id if parent needs one (temporary)
+  if (!layer.feature) layer.feature = { type: "Feature", properties: {} };
+  const tempId = 'temp-' + Date.now();
+  layer.feature.id = tempId;
+  layer.feature.properties.id = tempId;
+
+  // Add to correct collection
+  if (type === 'Marker' || type === 'CircleMarker') {
+    pointLayer.addLayer(layer);
+  } else {
+    polygonLayer.addLayer(layer);
+  }
+
+  send({
+    action: 'feature:created',
+    id: tempId,
+    geojson: layer.toGeoJSON(),
+    geometryType: type
+  });
+
+  // Optionally auto-enter edit mode for new feature
+  // layer.pm.enable();
+});
+
+// ── CSS glow for selected ────────────────────────────────
+const style = document.createElement('style');
+style.textContent = `
+  .selected-feature-glow {
+    filter: drop-shadow(0 0 6px #ff0) drop-shadow(0 0 12px #f80);
+  }
+`;
+document.head.appendChild(style);
+
+// Start
+initMap();
+</script>
+</body>
+</html>
