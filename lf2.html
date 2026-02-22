@@ -119,6 +119,35 @@ function initMap() {
 
     console.log('Map is ready — sent notification to parent');
   });
+
+  // ── New feature created ───────────────────────────────────────
+  map.on('pm:create', e => {
+    const layer = e.layer;
+    const type  = e.shape;
+
+    // Give it an id if parent needs one (temporary)
+    if (!layer.feature) layer.feature = { type: "Feature", properties: {} };
+    const tempId = 'temp-' + Date.now();
+    layer.feature.id = tempId;
+    layer.feature.properties.id = tempId;
+
+    // Add to correct collection
+    if (type === 'Marker' || type === 'CircleMarker') {
+      pointLayer.addLayer(layer);
+    } else {
+      polygonLayer.addLayer(layer);
+    }
+
+    send({
+      action: 'feature:created',
+      id: tempId,
+      geojson: layer.toGeoJSON(),
+      geometryType: type
+    });
+
+    // Optionally auto-enter edit mode for new feature
+    // layer.pm.enable();
+  });
 }
 
 // ────────────────────────────────────────────────
@@ -236,34 +265,7 @@ window.addEventListener('message', function(e) {
   }
 });
 
-// ── New feature created ───────────────────────────────────────
-map.on('pm:create', e => {
-  const layer = e.layer;
-  const type  = e.shape;
 
-  // Give it an id if parent needs one (temporary)
-  if (!layer.feature) layer.feature = { type: "Feature", properties: {} };
-  const tempId = 'temp-' + Date.now();
-  layer.feature.id = tempId;
-  layer.feature.properties.id = tempId;
-
-  // Add to correct collection
-  if (type === 'Marker' || type === 'CircleMarker') {
-    pointLayer.addLayer(layer);
-  } else {
-    polygonLayer.addLayer(layer);
-  }
-
-  send({
-    action: 'feature:created',
-    id: tempId,
-    geojson: layer.toGeoJSON(),
-    geometryType: type
-  });
-
-  // Optionally auto-enter edit mode for new feature
-  // layer.pm.enable();
-});
 
 // ── CSS glow for selected ────────────────────────────────
 const style = document.createElement('style');
