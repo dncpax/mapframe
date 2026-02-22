@@ -114,7 +114,7 @@ function initMap() {
 
     // Send to parent
     // Use specific targetOrigin instead of '*' in production!
-    window.parent.postMessage(readyMessage, '*');  
+    send(readyMessage, '*');  
     // Better (safer): window.parent.postMessage(readyMessage, 'https://your-parent-domain.com');
 
     console.log('Map is ready — sent notification to parent');
