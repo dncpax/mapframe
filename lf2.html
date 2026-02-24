@@ -75,9 +75,11 @@ function polyStyle(feature) {
 // Helper to find layer by feature id (used multiple times)
 function findLayerById(id) {
   let found = null;
-  editableGroup.eachLayer(layer => {
-    const fid = layer.feature?.mmv_id || layer.feature?.properties?.mmv_id;
-    if (fid === id) found = layer;
+  editableGroup.eachLayer(geoJsonLayer => {
+    geoJsonLayer.eachLayer(layer => {
+      const fid = layer.feature?.mmv_id || layer.feature?.properties?.mmv_id;
+      if (fid === id) found = layer;
+    });
   });
   return found;
 }
