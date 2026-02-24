@@ -76,7 +76,7 @@ function polyStyle(feature) {
 function findLayerById(id) {
   let found = null;
   editableGroup.eachLayer(layer => {
-    const fid = layer.feature?.id || layer.feature?.properties?.id;
+    const fid = layer.feature?.mmv_id || layer.feature?.properties?.mmv_id;
     if (fid === id) found = layer;
   });
   return found;
@@ -171,7 +171,7 @@ function initMap() {
 
   // ── Forward feature clicks to parent ─────────────────────────
   editableGroup.on('click', e => {
-    const fid = e.layer?.feature?.id || e.layer?.feature?.properties?.id;
+    const fid = e.layer?.feature?.mmv_id || e.layer?.feature?.properties?.mmv_id;
     if (fid) {
       send({ action: 'feature:click', id: fid });
     }
@@ -206,8 +206,8 @@ function initMap() {
     // Give it an id if parent needs one (temporary)
     if (!layer.feature) layer.feature = { type: "Feature", properties: {} };
     const tempId = 'temp-' + Date.now();
-    layer.feature.id = tempId;
-    layer.feature.properties.id = tempId;
+    layer.feature.mmv_id = tempId;
+    layer.feature.properties.mmv_id = tempId;
 
     // Add to correct collection
     if (type === 'Marker' || type === 'CircleMarker') {
@@ -256,7 +256,7 @@ window.addEventListener('message', function(e) {
 
   switch (data.action) {
 
-    case 'load:geojson': {
+    case 'load:geojson': 
       // Expect { points?: GeoJSON, polygons?: GeoJSON }
       if (data.points) {
         pointLayer.clearLayers().addData(data.points);
@@ -268,16 +268,16 @@ window.addEventListener('message', function(e) {
         editableGroup.getBounds().isValid() && map.fitBounds(editableGroup.getBounds(), { padding: [40,40] });
       }
       break;
-    }
+    
 
-    case 'zoomTo:feature': {
-      const id = data.id;
+    case 'zoomTo:feature': 
+      id = data.id;
       if (!id) return;
 
       const targetLayer = findLayerById(id);
       if (!targetLayer) {
         console.warn(`Cannot zoom — feature ${id} not found`);
-        // Optional: send({ action: 'zoom:failed', id });
+        send({ action: 'error', msg: `Erro no zoom - registo ${id} não encontrado no mapa.` });
         return;
       }
 
@@ -303,10 +303,10 @@ window.addEventListener('message', function(e) {
       send({ action: 'zoomedTo', id });
 
       break;
-    }
+    
 
-    case 'zoomAndEdit:feature': {
-      const id   = data.id;
+    case 'zoomAndEdit:feature': 
+      id   = data.id;
       const geoOnly = !!data.geometryOnly;
 
       if (!id) return;
@@ -315,7 +315,7 @@ window.addEventListener('message', function(e) {
       editOnlyGeometry  = geoOnly;
       singleEditMode    = true;
 
-      const targetLayer = findLayerById(id);
+      targetLayer = findLayerById(id);
       if (!targetLayer) {
         console.warn(`Feature ${id} not found`);
         return;
@@ -351,8 +351,8 @@ window.addEventListener('message', function(e) {
 
       send({ action: 'feature:selected', id });
       break;
-    }
-    case 'edit:stop': {
+    
+    case 'edit:stop': 
       // Clean up single edit mode
       singleEditMode = false;
       setAllLayersEditable(true);               // unlock everything
@@ -366,9 +366,9 @@ window.addEventListener('message', function(e) {
       selectedFeatureId = null;
       send({ action: 'edit:stopped' });
       break;
-    }
-    case 'select:feature': {
-      const id = data.id;
+    
+    case 'select:feature': 
+      id = data.id;
       selectedFeatureId = id;
       editOnlyGeometry  = !!data.geometryOnly;
 
@@ -378,7 +378,7 @@ window.addEventListener('message', function(e) {
         l.setStyle({ className: '' });   // remove highlight
       });
 
-      let targetLayer = null;
+      targetLayer = null;
       editableGroup.eachLayer(layer => {
         const fid = layer.feature?.id || layer.feature?.properties?.id;
         if (fid === id) {
@@ -414,15 +414,15 @@ window.addEventListener('message', function(e) {
         send({ action: 'feature:selected', id });
       }
       break;
-    }
+    
 
-    case 'edit:stop': {
+    case 'edit:stop': 
       editableGroup.eachLayer(l => l.pm?.disable?.());
       document.getElementById('mode-banner').style.display = 'none';
       selectedFeatureId = null;
       send({ action: 'edit:stopped' });
       break;
-    }
+    
 
     case 'enable:draw:marker':
       map.pm.Draw.Marker.enable();
