@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Leaflet Map – Editable</title>
+  <title>Mapa Leaflet</title>
 
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" 
         crossorigin=""/>
@@ -23,6 +23,16 @@
       background: #3338; color: white; padding: 6px 14px;
       border-radius: 4px; font-family: sans-serif; z-index: 1000;
       display: none; pointer-events: none;
+    }
+
+    /*mapa*/
+    .feature-locked {
+      opacity: 0.35 !important;
+      pointer-events: none;       /* prevents click / hover effects */
+    }
+
+    .selected-feature-glow {
+      filter: drop-shadow(0 0 8px #ff0) drop-shadow(0 0 15px #f80);
     }
   </style>
 </head>
@@ -46,6 +56,7 @@ let pointLayer       = L.geoJSON(null, {
 
 let selectedFeatureId = null;
 let editOnlyGeometry  = false;   // when true → hide attribute form prompt, only geometry
+let singleEditMode    = false;
 
 const DEBOUNCE_MS = 900;
 
@@ -58,6 +69,41 @@ function polyStyle(feature) {
     fillOpacity: 0.15
   };
 }
+
+// Helper to find layer by feature id (used multiple times)
+function findLayerById(id) {
+  let found = null;
+  editableGroup.eachLayer(layer => {
+    const fid = layer.feature?.id || layer.feature?.properties?.id;
+    if (fid === id) found = layer;
+  });
+  return found;
+}
+
+// Helper — disable/enable Geoman on ALL layers except optionally one
+function setAllLayersEditable(editable = true, exceptLayer = null) {
+  editableGroup.eachLayer(layer => {
+    if (layer === exceptLayer) return;
+
+    if (editable) {
+      // Re-enable Geoman (if it was removed)
+      if (!layer.pm) {
+        layer.pm = new L.PM.Edit(layer); // or just rely on global enable later
+      }
+      layer.pm?.enable?.();
+      layer.setStyle({ className: '' }); // remove locked style
+    } else {
+      // Most reliable way to **prevent** editing & handles
+      if (layer.pm) {
+        layer.pm.disable();
+        delete layer.pm;           // ← important — Geoman respects missing .pm
+      }
+      layer.setStyle({ className: 'feature-locked' });
+    }
+  });
+}
+
+
 
 // ────────────────────────────────────────────────
 function initMap() {
@@ -86,6 +132,18 @@ function initMap() {
     dragMode:        false,
     removalMode:     false,
     cutPolygon:      false
+  });
+
+
+  // Listen for global edit mode exit → good place to clean up single mode
+  map.on('pm:globaleditmodetoggled', e => {
+    if (!e.enabled && singleEditMode) {
+      singleEditMode = false;
+      setAllLayersEditable(true);           // restore others
+      document.getElementById('mode-banner').style.display = 'none';
+      editableGroup.eachLayer(l => l.setStyle({ className: '' }));
+      send({ action: 'edit:stopped' });
+    }
   });
 
   // ── Listen for geometry changes ──────────────────────────────
@@ -199,6 +257,68 @@ window.addEventListener('message', function(e) {
       break;
     }
 
+    case 'zoomAndEdit:feature': {
+      const id   = data.id;
+      const geoOnly = !!data.geometryOnly;
+
+      if (!id) return;
+
+      selectedFeatureId = id;
+      editOnlyGeometry  = geoOnly;
+      singleEditMode    = true;
+
+      const targetLayer = findLayerById(id);
+      if (!targetLayer) {
+        console.warn(`Feature ${id} not found`);
+        return;
+      }
+
+      // 1. Lock all other features
+      setAllLayersEditable(false, targetLayer);
+
+      // 2. Highlight target
+      targetLayer.setStyle({ className: 'selected-feature-glow' });
+
+      // 3. Zoom
+      if (targetLayer.getBounds) {
+        map.fitBounds(targetLayer.getBounds(), { padding: [80, 80], maxZoom: 18 });
+      } else if (targetLayer.getLatLng) {
+        map.setView(targetLayer.getLatLng(), 17);
+      }
+
+      // 4. Enter edit mode **only** for this layer
+      targetLayer.pm?.enable?.({
+        allowSelfIntersection: false,
+        preventMarkerRemoval: false,
+        hideMiddleMarkers: false,
+        // you can add more options: draggable: true, etc.
+      });
+
+      // 5. Banner
+      const banner = document.getElementById('mode-banner');
+      banner.textContent = geoOnly
+        ? "Edit geometry only — drag • Esc to cancel"
+        : "Editing feature — modify & save via form";
+      banner.style.display = 'block';
+
+      send({ action: 'feature:selected', id });
+      break;
+    }
+    case 'edit:stop': {
+      // Clean up single edit mode
+      singleEditMode = false;
+      setAllLayersEditable(true);               // unlock everything
+
+      editableGroup.eachLayer(l => {
+        l.pm?.disable?.();
+        l.setStyle({ className: '' });
+      });
+
+      document.getElementById('mode-banner').style.display = 'none';
+      selectedFeatureId = null;
+      send({ action: 'edit:stopped' });
+      break;
+    }
     case 'select:feature': {
       const id = data.id;
       selectedFeatureId = id;
