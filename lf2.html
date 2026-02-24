@@ -58,6 +58,8 @@ let selectedFeatureId = null;
 let editOnlyGeometry  = false;   // when true → hide attribute form prompt, only geometry
 let singleEditMode    = false;
 
+let highlightTimeout = null;   // for temporary glow on simple zoom
+
 const DEBOUNCE_MS = 900;
 
 // ────────────────────────────────────────────────
@@ -78,6 +80,18 @@ function findLayerById(id) {
     if (fid === id) found = layer;
   });
   return found;
+}
+
+// ── Optional: small helper to flash highlight (better UX for zoom only) ──
+function temporaryHighlight(layer, durationMs = 2400) {
+  if (!layer) return;
+
+  layer.setStyle({ className: 'selected-feature-glow' });
+
+  if (highlightTimeout) clearTimeout(highlightTimeout);
+  highlightTimeout = setTimeout(() => {
+    layer.setStyle({ className: '' });
+  }, durationMs);
 }
 
 // Helper — disable/enable Geoman on ALL layers except optionally one
@@ -102,7 +116,6 @@ function setAllLayersEditable(editable = true, exceptLayer = null) {
     }
   });
 }
-
 
 
 // ────────────────────────────────────────────────
@@ -254,6 +267,41 @@ window.addEventListener('message', function(e) {
       if (data.fit) {
         editableGroup.getBounds().isValid() && map.fitBounds(editableGroup.getBounds(), { padding: [40,40] });
       }
+      break;
+    }
+
+    case 'zoomTo:feature': {
+      const id = data.id;
+      if (!id) return;
+
+      const targetLayer = findLayerById(id);
+      if (!targetLayer) {
+        console.warn(`Cannot zoom — feature ${id} not found`);
+        // Optional: send({ action: 'zoom:failed', id });
+        return;
+      }
+
+      // Optional: brief visual feedback (glow fades after ~2.5s)
+      temporaryHighlight(targetLayer);
+
+      // Zoom / center
+      if (targetLayer.getBounds) {
+        // Polygon / polyline / rectangle etc.
+        map.fitBounds(targetLayer.getBounds(), {
+          padding: [60, 60],     // some breathing room
+          maxZoom: 17,           // avoid going too close if feature is huge
+          animate: true
+        });
+      } else if (targetLayer.getLatLng) {
+        // Point / marker / circle
+        map.setView(targetLayer.getLatLng(), 16, { animate: true });
+      } else {
+        console.warn('Layer has no bounds or latlng');
+      }
+
+      // Optional feedback to Appsmith
+      send({ action: 'zoomedTo', id });
+
       break;
     }
 
