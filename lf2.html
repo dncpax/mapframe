@@ -54,9 +54,13 @@ let pointLayer       = L.geoJSON(null, {
   pointToLayer: (f, latlng) => L.circleMarker(latlng, { radius: 7, fillColor: "#ff7800", color: "#000", weight: 1, opacity: 1, fillOpacity: 0.8 })
 }).addTo(editableGroup);
 
-let selectedFeatureId = null;
-let editOnlyGeometry  = false;   // when true → hide attribute form prompt, only geometry
-let singleEditMode    = false;
+let editLayer = L.geoJSON(null, {
+  // Distinct style for the feature being edited
+  style: { color: '#00ffff', weight: 4, opacity: 1, dashArray: '8, 8' },
+  pointToLayer: (f, latlng) => L.circleMarker(latlng, { radius: 10, fillColor: "#00ffff", color: "#fff", weight: 3, opacity: 1, fillOpacity: 0.9 })
+});
+
+let originalLayerBeingEdited = null; // a reference to the original layer that is hidden during edit
 
 let highlightTimeout = null;   // for temporary glow on simple zoom
 
@@ -134,6 +138,7 @@ function initMap() {
   }).addTo(map);
 
   editableGroup.addTo(map);
+  editLayer.addTo(map);
 
   // Geoman controls (we'll enable/disable tools dynamically)
   map.pm.addControls({
@@ -149,22 +154,8 @@ function initMap() {
     cutPolygon:      false
   });
 
-
-  // Listen for global edit mode exit → good place to clean up single mode
-  map.on('pm:globaleditmodetoggled', e => {
-    if (!e.enabled && singleEditMode) {
-      singleEditMode = false;
-      setAllLayersEditable(true);           // restore others
-      document.getElementById('mode-banner').style.display = 'none';
-      editableGroup.eachLayer(l => l.setStyle({ className: '' }));
-      send({ action: 'edit:stopped' });
-    }
-  });
-
   // ── Listen for geometry changes ──────────────────────────────
-  editableGroup.on('pm:dragend pm:markerdragend pm:vertex:changed', debounceSendGeometry);
-
-  // Optional: catch final save / mode exit
+  editLayer.on('pm:dragend pm:markerdragend pm:vertex:changed', debounceSendGeometry);
   map.on('pm:globaleditmodetoggled', e => {
     if (!e.enabled) {
       send({ action: 'edit:stopped' });
@@ -234,11 +225,11 @@ function initMap() {
 function debounceSendGeometry() {
   clearTimeout(window.geoDebounce);
   window.geoDebounce = setTimeout(() => {
-    const fc = {
-      type: "FeatureCollection",
-      features: editableGroup.toGeoJSON().features
-    };
-    send({ action: 'geometry:changed', geojson: fc });
+    if (editLayer.getLayers().length > 0) {
+      // There is only ever one feature in the edit layer
+      const editedFeature = editLayer.getLayers()[0].toGeoJSON();
+      send({ action: 'geometry:changed', geojson: editedFeature });
+    }
   }, DEBOUNCE_MS);
 }
 
@@ -266,6 +257,7 @@ window.addEventListener('message', function(e) {
       if (data.polygons) {
         polygonLayer.clearLayers().addData(data.polygons);
       }
+      editLayer.clearLayers(); // Ensure edit layer is cleared on full refresh
       if (data.fit) {
         editableGroup.getBounds().isValid() && map.fitBounds(editableGroup.getBounds(), { padding: [40,40] });
       }
@@ -307,124 +299,89 @@ window.addEventListener('message', function(e) {
       break;
     
 
-    case 'zoomAndEdit:feature': 
-      id   = data.id;
-      const geoOnly = !!data.geometryOnly;
-
+    case 'edit:start':
+      const id = data.id;
       if (!id) return;
+      // If an edit is already in progress, cancel it first
+      if (originalLayerBeingEdited) {
+        // Restore the old one before starting a new edit
+        const sourceLayer = (originalLayerBeingEdited.feature.geometry.type.includes('Point')) ? pointLayer : polygonLayer;
+        sourceLayer.addLayer(originalLayerBeingEdited);
+      }
+      editLayer.clearLayers();
 
-      selectedFeatureId = id;
-      editOnlyGeometry  = geoOnly;
-      singleEditMode    = true;
-
-      targetLayer = findLayerById(id);
-      if (!targetLayer) {
-        console.warn(`Feature ${id} not found`);
+      const layerToEdit = findLayerById(id);
+      if (!layerToEdit) {
+        console.warn(`Cannot edit - feature ${id} not found`);
+        send({ action: 'error', msg: `Erro ao editar - registo ${id} não encontrado no mapa.` });
         return;
       }
 
-      // 1. Lock all other features
-      setAllLayersEditable(false, targetLayer);
+      // 1. Store and remove the original layer from its source
+      originalLayerBeingEdited = layerToEdit;
+      const sourceLayer = (layerToEdit.feature.geometry.type.includes('Point')) ? pointLayer : polygonLayer;
+      sourceLayer.removeLayer(layerToEdit);
 
-      // 2. Highlight target
-      targetLayer.setStyle({ className: 'selected-feature-glow' });
+      // 2. Add a copy of the feature to the dedicated edit layer
+      const featureCopy = layerToEdit.toGeoJSON();
+      editLayer.addData(featureCopy);
 
-      // 3. Zoom
-      if (targetLayer.getBounds) {
-        map.fitBounds(targetLayer.getBounds(), { padding: [80, 80], maxZoom: 18 });
-      } else if (targetLayer.getLatLng) {
-        map.setView(targetLayer.getLatLng(), 17);
-      }
-
-      // 4. Enter edit mode **only** for this layer
-      targetLayer.pm?.enable?.({
-        allowSelfIntersection: false,
-        preventMarkerRemoval: false,
-        hideMiddleMarkers: false,
-        // you can add more options: draggable: true, etc.
+      // 3. Enable editing on the new layer in editLayer and zoom
+      editLayer.eachLayer(newEditLayer => {
+        newEditLayer.pm.enable({ allowSelfIntersection: false });
+        if (newEditLayer.getBounds) {
+          map.fitBounds(newEditLayer.getBounds(), { padding: [80, 80], maxZoom: 18 });
+        } else if (newEditLayer.getLatLng) {
+          map.setView(newEditLayer.getLatLng(), 17);
+        }
       });
 
-      // 5. Banner
+      // 4. Show banner and notify parent
       const banner = document.getElementById('mode-banner');
-      banner.textContent = geoOnly
-        ? "Edit geometry only — drag • Esc to cancel"
-        : "Editing feature — modify & save via form";
+      banner.textContent = "Modo de Edição";
       banner.style.display = 'block';
 
-      send({ action: 'feature:selected', id });
+      send({ action: 'edit:started', id: id });
       break;
-    
-    case 'edit:stop': 
-      // Clean up single edit mode
-      singleEditMode = false;
-      setAllLayersEditable(true);               // unlock everything
 
-      editableGroup.eachLayer(l => {
-        l.pm?.disable?.();
-        l.setStyle({ className: '' });
-      });
-
-      document.getElementById('mode-banner').style.display = 'none';
-      selectedFeatureId = null;
-      send({ action: 'edit:stopped' });
-      break;
-    
-    case 'select:feature': 
-      id = data.id;
-      selectedFeatureId = id;
-      editOnlyGeometry  = !!data.geometryOnly;
-
-      // Reset previous
-      editableGroup.eachLayer(l => {
-        l.pm?.disable?.();
-        l.setStyle({ className: '' });   // remove highlight
-      });
-
-      targetLayer = null;
-      editableGroup.eachLayer(layer => {
-        const fid = layer.feature?.id || layer.feature?.properties?.id;
-        if (fid === id) {
-          targetLayer = layer;
-        }
-      });
-
-      if (targetLayer) {
-        // Highlight
-        targetLayer.setStyle({ className: 'selected-feature-glow' });
-
-        // Zoom
-        if (targetLayer.getBounds) {
-          map.fitBounds(targetLayer.getBounds(), { padding: [60,60], maxZoom: 17 });
-        } else if (targetLayer.getLatLng) {
-          map.setView(targetLayer.getLatLng(), 17);
-        }
-
-        // Enter edit mode only for this layer
-        targetLayer.pm?.enable?.({
-          allowSelfIntersection: false,
-          preventMarkerRemoval: false,
-          hideMiddleMarkers: false
-        });
-
-        // Show banner
-        const banner = document.getElementById('mode-banner');
-        banner.textContent = editOnlyGeometry
-          ? "Repositioning – drag handles • Esc to cancel"
-          : "Editing feature – modify shape & save in form";
-        banner.style.display = 'block';
-
-        send({ action: 'feature:selected', id });
+    case 'edit:stop': // This now means "finish and save"
+      if (editLayer.getLayers().length > 0) {
+        const editedFeature = editLayer.getLayers()[0].toGeoJSON();
+        send({ action: 'edit:finished', geojson: editedFeature });
       }
-      break;
-    
-
-    case 'edit:stop': 
-      editableGroup.eachLayer(l => l.pm?.disable?.());
+      // Clean up the edit state
+      editLayer.clearLayers();
+      originalLayerBeingEdited = null; // The original is gone, waiting for an update
       document.getElementById('mode-banner').style.display = 'none';
-      selectedFeatureId = null;
-      send({ action: 'edit:stopped' });
+      
       break;
     
+    case 'edit:cancel':
+      if (originalLayerBeingEdited) {
+        // Restore the original layer to its source
+        const sourceLayer = (originalLayerBeingEdited.feature.geometry.type.includes('Point')) ? pointLayer : polygonLayer;
+        sourceLayer.addLayer(originalLayerBeingEdited);
+        originalLayerBeingEdited = null;
+      }
+      editLayer.clearLayers();
+      document.getElementById('mode-banner').style.display = 'none';
+      send({ action: 'edit:cancelled' });
+      break;
+
+    case 'update:feature':
+      const featureData = data.feature;
+      if (!featureData || !featureData.properties || !featureData.properties.mmv_id) return;
+
+      const featureId = featureData.properties.mmv_id;
+
+      // Find and remove the old version of the layer, if it exists
+      const oldLayer = findLayerById(featureId);
+      if (oldLayer) oldLayer.remove();
+
+      // Add the updated feature to the correct layer
+      const targetLayer = (featureData.geometry.type.includes('Point')) ? pointLayer : polygonLayer;
+      targetLayer.addData(featureData);
+      break;
 
     case 'enable:draw:marker':
       map.pm.Draw.Marker.enable();
