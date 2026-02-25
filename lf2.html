@@ -403,16 +403,6 @@ window.addEventListener('message', function(e) {
 });
 
 
-
-// ── CSS glow for selected ────────────────────────────────
-const style = document.createElement('style');
-style.textContent = `
-  .selected-feature-glow {
-    filter: drop-shadow(0 0 6px #ff0) drop-shadow(0 0 12px #f80);
-  }
-`;
-document.head.appendChild(style);
-
 // Start
 initMap();
 </script>
