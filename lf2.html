@@ -264,8 +264,8 @@ window.addEventListener('message', function(e) {
       break;
     
 
-    case 'zoomTo:feature': 
-      id = data.id;
+    case 'zoomTo:feature': {
+      const id = data.id;
       if (!id) return;
 
       const targetLayer = findLayerById(id);
@@ -297,9 +297,10 @@ window.addEventListener('message', function(e) {
       send({ action: 'zoomedTo', id });
 
       break;
+    }
     
 
-    case 'edit:start':
+    case 'edit:start': {
       const id = data.id;
       if (!id) return;
       // If an edit is already in progress, cancel it first
@@ -343,6 +344,7 @@ window.addEventListener('message', function(e) {
 
       send({ action: 'edit:started', id: id });
       break;
+    }
 
     case 'edit:stop': // This now means "finish and save"
       if (editLayer.getLayers().length > 0) {
@@ -368,7 +370,7 @@ window.addEventListener('message', function(e) {
       send({ action: 'edit:cancelled' });
       break;
 
-    case 'update:feature':
+    case 'update:feature': {
       const featureData = data.feature;
       if (!featureData || !featureData.properties || !featureData.properties.mmv_id) return;
 
@@ -382,6 +384,7 @@ window.addEventListener('message', function(e) {
       const targetLayer = (featureData.geometry.type.includes('Point')) ? pointLayer : polygonLayer;
       targetLayer.addData(featureData);
       break;
+    }
 
     case 'enable:draw:marker':
       map.pm.Draw.Marker.enable();
