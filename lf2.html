@@ -127,15 +127,22 @@ function setAllLayersEditable(editable = true, exceptLayer = null) {
 // ────────────────────────────────────────────────
 function initMap() {
   debugger;
+
+  // 1. Define the basemaps
+  const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap'
+  });
+
+  const aerial = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+  });
+
   map = L.map('map', {
     center: [39,-7.8],
     zoom: 8,
-    pmIgnore: false   // important for Geoman
+    pmIgnore: false,   // important for Geoman
+    layers: [osm]      // Set the default basemap
   });
-
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '&copy; OpenStreetMap'
-  }).addTo(map);
 
   editableGroup.addTo(map);
   editLayer.addTo(map);
@@ -153,6 +160,13 @@ function initMap() {
     removalMode:     false,
     cutPolygon:      false
   });
+
+  // 2. Add the layers control
+  const baseMaps = {
+    "Street Map": osm,
+    "Aerial": aerial
+  };
+  L.control.layers(baseMaps).addTo(map);
 
   // ── Listen for geometry changes ──────────────────────────────
   editLayer.on('pm:dragend pm:markerdragend pm:vertex:changed', debounceSendGeometry);
