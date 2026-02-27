@@ -30,12 +30,6 @@
       opacity: 0.35 !important;
       pointer-events: none;       /* prevents click / hover effects */
     }
-
-    .selected-feature-glow {
-      stroke: #ffff00 !important;
-      stroke-width: 3px !important;
-      filter: drop-shadow(0 0 8px #ff0) drop-shadow(0 0 15px #f80);
-    }
   </style>
 </head>
 <body>
@@ -67,6 +61,12 @@ let originalLayerBeingEdited = null; // a reference to the original layer that i
 
 let highlightTimeout = null;   // for temporary glow on simple zoom
 let highlightedLayer = null;   // Reference to the currently highlighted layer
+
+const HIGHLIGHT_STYLE = {
+  color: '#ffff00',
+  weight: 4,
+  opacity: 1
+};
 
 const DEBOUNCE_MS = 900;
 
@@ -112,16 +112,30 @@ function temporaryHighlight(layer, durationMs = 2400) {
 
   // Reset previous highlight if active
   if (highlightedLayer) {
-    highlightedLayer.setStyle({ className: '' });
+    if (highlightedLayer._origStyle) {
+      highlightedLayer.setStyle(highlightedLayer._origStyle);
+      delete highlightedLayer._origStyle;
+    }
     highlightedLayer = null;
   }
   if (highlightTimeout) clearTimeout(highlightTimeout);
 
+  // Save current style
+  layer._origStyle = {
+    color: layer.options.color,
+    weight: layer.options.weight,
+    opacity: layer.options.opacity
+  };
+
   highlightedLayer = layer;
-  layer.setStyle({ className: 'selected-feature-glow' });
+  layer.setStyle(HIGHLIGHT_STYLE);
+  if (layer.bringToFront) layer.bringToFront();
 
   highlightTimeout = setTimeout(() => {
-    if (highlightedLayer) highlightedLayer.setStyle({ className: '' });
+    if (highlightedLayer && highlightedLayer._origStyle) {
+      highlightedLayer.setStyle(highlightedLayer._origStyle);
+      delete highlightedLayer._origStyle;
+    }
     highlightedLayer = null;
   }, durationMs);
 }
