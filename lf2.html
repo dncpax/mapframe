@@ -215,6 +215,11 @@ function initMap() {
       send({ action: 'edit:stopped' });
     }
   });
+  map.on('pm:globaldrawmodetoggled', e => {
+    if (!e.enabled) {
+      send({ action: 'draw:stopped' });
+    }
+  });
 
   // ── Forward feature clicks to parent ─────────────────────────
   editableGroup.on('click', e => {
@@ -255,6 +260,9 @@ function initMap() {
     const tempId = 'temp-' + Date.now();
     layer.feature.mmv_id = tempId;
     layer.feature.properties.mmv_id = tempId;
+
+    // Bind popup to new feature immediately
+    onEachFeature(layer.feature, layer);
 
     // Add to correct collection
     if (type === 'Marker' || type === 'CircleMarker') {
@@ -451,7 +459,7 @@ window.addEventListener('message', function(e) {
     // ... you can add more draw types
 
     case 'disable:draw':
-      map.pm.Draw.disable();
+      map.pm.disableDraw();
       break;
   }
 });
