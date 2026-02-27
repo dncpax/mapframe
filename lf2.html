@@ -255,6 +255,9 @@ function initMap() {
     const layer = e.layer;
     const type  = e.shape;
 
+    // Stop drawing immediately
+    map.pm.disableDraw();
+
     // Give it an id if parent needs one (temporary)
     if (!layer.feature) layer.feature = { type: "Feature", properties: {} };
     const tempId = 'temp-' + Date.now();
@@ -278,8 +281,18 @@ function initMap() {
       geometryType: type
     });
 
-    // Optionally auto-enter edit mode for new feature
-    // layer.pm.enable();
+    // Auto-enter edit mode for new feature
+    layer.pm.enable();
+
+    // Listen for drags on this new layer to send updates
+    layer.on('pm:markerdragend pm:dragend pm:edit', () => {
+      send({
+        action: 'feature:created',
+        id: tempId,
+        geojson: layer.toGeoJSON(),
+        geometryType: type
+      });
+    });
   });
 }
 
