@@ -462,11 +462,14 @@ window.addEventListener('message', function(e) {
     }
 
     case 'enable:draw:marker':
-      map.pm.Draw.Marker.enable();
+      // Use a timeout to prevent any potential event chain conflicts
+      // that might cause instant creation.
+      setTimeout(() => map.pm.Draw.Marker.enable(), 50);
       break;
 
     case 'enable:draw:polygon':
-      map.pm.Draw.Polygon.enable();
+      // Use a timeout for consistency
+      setTimeout(() => map.pm.Draw.Polygon.enable(), 50);
       break;
 
     // ... you can add more draw types
