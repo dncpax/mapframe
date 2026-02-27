@@ -63,6 +63,7 @@ let editLayer = L.geoJSON(null, {
 let originalLayerBeingEdited = null; // a reference to the original layer that is hidden during edit
 
 let highlightTimeout = null;   // for temporary glow on simple zoom
+let highlightedLayer = null;   // Reference to the currently highlighted layer
 
 const DEBOUNCE_MS = 900;
 
@@ -92,11 +93,19 @@ function findLayerById(id) {
 function temporaryHighlight(layer, durationMs = 2400) {
   if (!layer) return;
 
+  // Reset previous highlight if active
+  if (highlightedLayer) {
+    highlightedLayer.setStyle({ className: '' });
+    highlightedLayer = null;
+  }
+  if (highlightTimeout) clearTimeout(highlightTimeout);
+
+  highlightedLayer = layer;
   layer.setStyle({ className: 'selected-feature-glow' });
 
-  if (highlightTimeout) clearTimeout(highlightTimeout);
   highlightTimeout = setTimeout(() => {
-    layer.setStyle({ className: '' });
+    if (highlightedLayer) highlightedLayer.setStyle({ className: '' });
+    highlightedLayer = null;
   }, durationMs);
 }
 
