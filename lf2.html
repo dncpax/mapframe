@@ -49,9 +49,10 @@
 // Globals & layers
 let map;
 let editableGroup     = L.featureGroup();
-let polygonLayer     = L.geoJSON(null, { style: polyStyle }).addTo(editableGroup);
+let polygonLayer     = L.geoJSON(null, { style: polyStyle, onEachFeature: onEachFeature }).addTo(editableGroup);
 let pointLayer       = L.geoJSON(null, {
-  pointToLayer: (f, latlng) => L.circleMarker(latlng, { radius: 7, fillColor: "#ff7800", color: "#000", weight: 1, opacity: 1, fillOpacity: 0.8 })
+  pointToLayer: (f, latlng) => L.circleMarker(latlng, { radius: 7, fillColor: "#ff7800", color: "#000", weight: 1, opacity: 1, fillOpacity: 0.8 }),
+  onEachFeature: onEachFeature
 }).addTo(editableGroup);
 
 let editLayer = L.geoJSON(null, {
@@ -75,6 +76,20 @@ function polyStyle(feature) {
     opacity: 0.85,
     fillOpacity: 0.15
   };
+}
+
+// ────────────────────────────────────────────────
+// Popup logic
+function onEachFeature(feature, layer) {
+  if (feature.properties) {
+    let content = '<div style="font-size:13px; line-height:1.4;">';
+    for (const [key, value] of Object.entries(feature.properties)) {
+      // Skip internal IDs or complex objects if needed
+      content += `<strong>${key}:</strong> ${value}<br>`;
+    }
+    content += '</div>';
+    layer.bindPopup(content);
+  }
 }
 
 // Helper to find layer by feature id (used multiple times)
