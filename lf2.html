@@ -3,9 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Mapa Leaflet</title> 
+  <title>Mapa Leaflet</title>
 
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" 
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
         crossorigin=""/>
   <link rel="stylesheet" href="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.css"/>
 
@@ -13,9 +13,9 @@
     html, body, #map { height: 100%; margin: 0; padding: 0; }
     #map {
       height: 100%;
-			width: 100%;
-			max-width: 100%;
-			max-height: 100%;
+		width: 100%;
+		max-width: 100%;
+		max-height: 100%;
     }
     #mode-banner {
       position: absolute;
@@ -166,6 +166,8 @@ function setAllLayersEditable(editable = true, exceptLayer = null) {
 
 // ────────────────────────────────────────────────
 function initMap() {
+  debugger;
+
   // 1. Define the basemaps
   const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; OpenStreetMap'
@@ -242,7 +244,7 @@ function initMap() {
 
     // Send to parent
     // Use specific targetOrigin instead of '*' in production!
-    send(readyMessage, '*');  
+    send(readyMessage, '*');
     // Better (safer): window.parent.postMessage(readyMessage, 'https://your-parent-domain.com');
 
     console.log('Map is ready — sent notification to parent');
@@ -256,7 +258,7 @@ function initMap() {
     // Stop drawing immediately
     map.pm.disableDraw();
 
-    // Give it a temporary id
+    // Give it an id if parent needs one (temporary)
     if (!layer.feature) layer.feature = { type: "Feature", properties: {} };
     const tempId = 'temp-' + Date.now();
     layer.feature.mmv_id = tempId;
@@ -272,11 +274,6 @@ function initMap() {
       polygonLayer.addLayer(layer);
     }
 
-    // Update banner: drawing done, user can still adjust before saving
-    const banner = document.getElementById('mode-banner');
-    banner.textContent = 'Geometria criada — ajuste se necessário e guarde em Appsmith';
-    banner.style.display = 'block';
-
     send({
       action: 'feature:created',
       id: tempId,
@@ -284,10 +281,10 @@ function initMap() {
       geometryType: type
     });
 
-    // Auto-enter edit mode so user can fine-tune immediately
+    // Auto-enter edit mode for new feature
     layer.pm.enable();
 
-    // Send updated geometry on each adjustment
+    // Listen for drags on this new layer to send updates
     layer.on('pm:markerdragend pm:dragend pm:edit', () => {
       send({
         action: 'feature:created',
@@ -327,7 +324,7 @@ window.addEventListener('message', function(e) {
 
   switch (data.action) {
 
-    case 'load:geojson': 
+    case 'load:geojson':
       // Expect { points?: GeoJSON, polygons?: GeoJSON }
       if (data.points) {
         pointLayer.clearLayers().addData(data.points);
@@ -340,7 +337,7 @@ window.addEventListener('message', function(e) {
         editableGroup.getBounds().isValid() && map.fitBounds(editableGroup.getBounds(), { padding: [40,40] });
       }
       break;
-    
+
 
     case 'zoomTo:feature': {
       const id = data.id;
@@ -376,7 +373,7 @@ window.addEventListener('message', function(e) {
 
       break;
     }
-    
+
 
     case 'edit:start': {
       const id = data.id;
@@ -433,9 +430,9 @@ window.addEventListener('message', function(e) {
       editLayer.clearLayers();
       originalLayerBeingEdited = null; // The original is gone, waiting for an update
       document.getElementById('mode-banner').style.display = 'none';
-      
+
       break;
-    
+
     case 'edit:cancel':
       if (originalLayerBeingEdited) {
         // Restore the original layer to its source
@@ -464,37 +461,22 @@ window.addEventListener('message', function(e) {
       break;
     }
 
-    case 'enable:draw:marker': {
-      const banner = document.getElementById('mode-banner');
-      banner.textContent = 'Modo de Criação — clique no mapa para colocar o ponto';
-      banner.style.display = 'block';
+    case 'enable:draw:marker':
+      // Use a timeout to prevent any potential event chain conflicts
+      // that might cause instant creation.
       setTimeout(() => map.pm.Draw.Marker.enable(), 50);
       break;
-    }
 
-    case 'enable:draw:polygon': {
-      const banner = document.getElementById('mode-banner');
-      banner.textContent = 'Modo de Criação — desenhe o polígono e feche-o para terminar';
-      banner.style.display = 'block';
+    case 'enable:draw:polygon':
+      // Use a timeout for consistency
       setTimeout(() => map.pm.Draw.Polygon.enable(), 50);
       break;
-    }
+
+    // ... you can add more draw types
 
     case 'disable:draw':
       map.pm.disableDraw();
-      document.getElementById('mode-banner').style.display = 'none';
       break;
-
-    case 'create:cancel': {
-      map.pm.disableDraw();
-      if (data.tempId) {
-        const tempLayer = findLayerById(data.tempId);
-        if (tempLayer) tempLayer.remove();
-      }
-      document.getElementById('mode-banner').style.display = 'none';
-      send({ action: 'create:cancelled' });
-      break;
-    }
   }
 });
 
