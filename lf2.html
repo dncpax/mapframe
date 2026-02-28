@@ -166,8 +166,6 @@ function setAllLayersEditable(editable = true, exceptLayer = null) {
 
 // ────────────────────────────────────────────────
 function initMap() {
-  debugger;
-
   // 1. Define the basemaps
   const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; OpenStreetMap'
@@ -258,7 +256,7 @@ function initMap() {
     // Stop drawing immediately
     map.pm.disableDraw();
 
-    // Give it an id if parent needs one (temporary)
+    // Give it a temporary id
     if (!layer.feature) layer.feature = { type: "Feature", properties: {} };
     const tempId = 'temp-' + Date.now();
     layer.feature.mmv_id = tempId;
@@ -274,6 +272,11 @@ function initMap() {
       polygonLayer.addLayer(layer);
     }
 
+    // Update banner: drawing done, user can still adjust before saving
+    const banner = document.getElementById('mode-banner');
+    banner.textContent = 'Geometria criada — ajuste se necessário e guarde em Appsmith';
+    banner.style.display = 'block';
+
     send({
       action: 'feature:created',
       id: tempId,
@@ -281,10 +284,10 @@ function initMap() {
       geometryType: type
     });
 
-    // Auto-enter edit mode for new feature
+    // Auto-enter edit mode so user can fine-tune immediately
     layer.pm.enable();
 
-    // Listen for drags on this new layer to send updates
+    // Send updated geometry on each adjustment
     layer.on('pm:markerdragend pm:dragend pm:edit', () => {
       send({
         action: 'feature:created',
@@ -461,22 +464,37 @@ window.addEventListener('message', function(e) {
       break;
     }
 
-    case 'enable:draw:marker':
-      // Use a timeout to prevent any potential event chain conflicts
-      // that might cause instant creation.
+    case 'enable:draw:marker': {
+      const banner = document.getElementById('mode-banner');
+      banner.textContent = 'Modo de Criação — clique no mapa para colocar o ponto';
+      banner.style.display = 'block';
       setTimeout(() => map.pm.Draw.Marker.enable(), 50);
       break;
+    }
 
-    case 'enable:draw:polygon':
-      // Use a timeout for consistency
+    case 'enable:draw:polygon': {
+      const banner = document.getElementById('mode-banner');
+      banner.textContent = 'Modo de Criação — desenhe o polígono e feche-o para terminar';
+      banner.style.display = 'block';
       setTimeout(() => map.pm.Draw.Polygon.enable(), 50);
       break;
-
-    // ... you can add more draw types
+    }
 
     case 'disable:draw':
       map.pm.disableDraw();
+      document.getElementById('mode-banner').style.display = 'none';
       break;
+
+    case 'create:cancel': {
+      map.pm.disableDraw();
+      if (data.tempId) {
+        const tempLayer = findLayerById(data.tempId);
+        if (tempLayer) tempLayer.remove();
+      }
+      document.getElementById('mode-banner').style.display = 'none';
+      send({ action: 'create:cancelled' });
+      break;
+    }
   }
 });
 
