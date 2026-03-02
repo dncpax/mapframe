@@ -44,6 +44,7 @@
 // ────────────────────────────────────────────────
 // Globals & layers
 let map;
+let currentEditedGeometry = null; // always holds the latest staged geometry (edit or create)
 let editableGroup     = L.featureGroup();
 let polygonLayer     = L.geoJSON(null, { style: polyStyle, onEachFeature: onEachFeature }).addTo(editableGroup);
 let pointLayer       = L.geoJSON(null, {
@@ -274,10 +275,11 @@ function initMap() {
       polygonLayer.addLayer(layer);
     }
 
+    currentEditedGeometry = layer.toGeoJSON(); // seed local var immediately
     send({
       action: 'feature:created',
       id: tempId,
-      geojson: layer.toGeoJSON(),
+      geojson: currentEditedGeometry,
       geometryType: type
     });
 
@@ -286,10 +288,11 @@ function initMap() {
 
     // Listen for drags on this new layer to send updates
     layer.on('pm:markerdragend pm:dragend pm:edit', () => {
+      currentEditedGeometry = layer.toGeoJSON(); // keep local var current
       send({
         action: 'feature:created',
         id: tempId,
-        geojson: layer.toGeoJSON(),
+        geojson: currentEditedGeometry,
         geometryType: type
       });
     });
@@ -303,6 +306,7 @@ function debounceSendGeometry() {
     if (editLayer.getLayers().length > 0) {
       // There is only ever one feature in the edit layer
       const editedFeature = editLayer.getLayers()[0].toGeoJSON();
+      currentEditedGeometry = editedFeature;  // keep local copy current
       send({ action: 'geometry:changed', geojson: editedFeature });
     }
   }, DEBOUNCE_MS);
@@ -378,6 +382,7 @@ window.addEventListener('message', function(e) {
     case 'edit:start': {
       const id = data.id;
       if (!id) return;
+      currentEditedGeometry = null; // reset before new edit session
       // If an edit is already in progress, cancel it first
       if (originalLayerBeingEdited) {
         // Restore the old one before starting a new edit
@@ -434,6 +439,7 @@ window.addEventListener('message', function(e) {
       break;
 
     case 'edit:cancel':
+      currentEditedGeometry = null;
       if (originalLayerBeingEdited) {
         // Restore the original layer to its source
         const sourceLayer = (originalLayerBeingEdited.feature.geometry.type.includes('Point')) ? pointLayer : polygonLayer;
