@@ -59,6 +59,7 @@ let editLayer = L.geoJSON(null, {
 });
 
 let originalLayerBeingEdited = null; // a reference to the original layer that is hidden during edit
+let pendingCreatedLayer = null;      // a newly drawn, not-yet-saved layer (null once saved or cancelled)
 
 let highlightTimeout = null;   // for temporary glow on simple zoom
 let highlightedLayer = null;   // Reference to the currently highlighted layer
@@ -274,6 +275,7 @@ function initMap() {
     } else {
       polygonLayer.addLayer(layer);
     }
+    pendingCreatedLayer = layer; // track so cancel can remove it
 
     currentEditedGeometry = layer.toGeoJSON(); // seed local var immediately
     send({
@@ -337,6 +339,7 @@ window.addEventListener('message', function(e) {
         polygonLayer.clearLayers().addData(data.polygons);
       }
       editLayer.clearLayers(); // Ensure edit layer is cleared on full refresh
+      pendingCreatedLayer = null; // layer was either saved (now reloaded) or irrelevant
       if (data.fit) {
         editableGroup.getBounds().isValid() && map.fitBounds(editableGroup.getBounds(), { padding: [40,40] });
       }
@@ -440,6 +443,12 @@ window.addEventListener('message', function(e) {
 
     case 'edit:cancel':
       currentEditedGeometry = null;
+      // Remove a newly drawn layer that was never saved
+      if (pendingCreatedLayer) {
+        pointLayer.removeLayer(pendingCreatedLayer);
+        polygonLayer.removeLayer(pendingCreatedLayer);
+        pendingCreatedLayer = null;
+      }
       if (originalLayerBeingEdited) {
         // Restore the original layer to its source
         const sourceLayer = (originalLayerBeingEdited.feature.geometry.type.includes('Point')) ? pointLayer : polygonLayer;
