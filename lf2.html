@@ -477,14 +477,19 @@ window.addEventListener('message', function(e) {
     }
 
     case 'enable:draw:marker':
-      // Use a timeout to prevent any potential event chain conflicts
-      // that might cause instant creation.
-      setTimeout(() => map.pm.Draw.Marker.enable(), 50);
+      // disableDraw() + enable() must happen in the same tick so no
+      // deferred Geoman event from the disable can fire in between.
+      setTimeout(() => {
+        map.pm.disableDraw();
+        map.pm.Draw.Marker.enable();
+      }, 100);
       break;
 
     case 'enable:draw:polygon':
-      // Use a timeout for consistency
-      setTimeout(() => map.pm.Draw.Polygon.enable(), 50);
+      setTimeout(() => {
+        map.pm.disableDraw();
+        map.pm.Draw.Polygon.enable();
+      }, 100);
       break;
 
     // ... you can add more draw types
