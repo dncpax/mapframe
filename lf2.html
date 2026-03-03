@@ -274,6 +274,7 @@ function initMap() {
       pointLayer.addLayer(layer);
     } else {
       polygonLayer.addLayer(layer);
+      layer.setStyle(polyStyle(layer.feature)); // addLayer() skips the style fn — apply manually
     }
     pendingCreatedLayer = layer; // track so cancel can remove it
 
