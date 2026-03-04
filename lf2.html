@@ -191,6 +191,15 @@ function initMap() {
 
   // Geoman toolbar not shown — all drawing is triggered via postMessage
 
+  // Portuguese tooltips for draw mode
+  map.pm.setLang('custom', {
+    tooltips: {
+      placeMarker:    'Clique para colocar o ponto',
+      firstVertex:    'Clique para colocar o primeiro vértice'
+    }
+  }, 'en');
+  map.pm.setLang('custom');
+
   // 2. Add the layers control
   const baseMaps = {
     "Street Map": osm,
