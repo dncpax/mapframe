@@ -179,6 +179,14 @@ function initMap() {
     attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
   });
 
+  const ortos2021 = L.tileLayer.wms('https://ide.ccdr-n.pt/wmsproxy/wms?', {
+    layers: 'ortos2021_rn',
+    format: 'image/png',
+    transparent: false,
+    crs: L.CRS.EPSG3857,
+    attribution: 'Ortos 2021 RN &copy; CCDR-N'
+  });
+
   map = L.map('map', {
     center: [39,-7.8],
     zoom: 8,
@@ -203,7 +211,8 @@ function initMap() {
   // 2. Add the layers control
   const baseMaps = {
     "Street Map": osm,
-    "Aerial": aerial
+    "Aerial": aerial,
+    "Ortos 2021 RN": ortos2021
   };
   L.control.layers(baseMaps).addTo(map);
 
