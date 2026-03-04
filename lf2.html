@@ -435,7 +435,8 @@ window.addEventListener('message', function(e) {
         const editedFeature = editLayer.getLayers()[0].toGeoJSON();
         send({ action: 'edit:finished', geojson: editedFeature });
       }
-      // Clean up the edit state
+      // Clean up the edit state — disable pm first to remove vertex handles from map
+      editLayer.eachLayer(l => { if (l.pm) l.pm.disable(); });
       editLayer.clearLayers();
       originalLayerBeingEdited = null; // The original is gone, waiting for an update
       document.getElementById('mode-banner').style.display = 'none';
@@ -446,6 +447,7 @@ window.addEventListener('message', function(e) {
       currentEditedGeometry = null;
       // Remove a newly drawn layer that was never saved
       if (pendingCreatedLayer) {
+        if (pendingCreatedLayer.pm) pendingCreatedLayer.pm.disable();
         pointLayer.removeLayer(pendingCreatedLayer);
         polygonLayer.removeLayer(pendingCreatedLayer);
         pendingCreatedLayer = null;
@@ -456,6 +458,8 @@ window.addEventListener('message', function(e) {
         sourceLayer.addLayer(originalLayerBeingEdited);
         originalLayerBeingEdited = null;
       }
+      // Disable pm before clearLayers to remove Geoman vertex handles from the map
+      editLayer.eachLayer(l => { if (l.pm) l.pm.disable(); });
       editLayer.clearLayers();
       document.getElementById('mode-banner').style.display = 'none';
       send({ action: 'edit:cancelled' });
