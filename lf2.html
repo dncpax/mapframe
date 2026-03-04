@@ -189,19 +189,7 @@ function initMap() {
   editableGroup.addTo(map);
   editLayer.addTo(map);
 
-  // Geoman controls (we'll enable/disable tools dynamically)
-  map.pm.addControls({
-    position: 'topleft',
-    drawMarker:      false,   // controlled manually
-    drawPolygon:     false,
-    drawCircle:      false,
-    drawRectangle:   false,
-    drawPolyline:    false,
-    editMode:        false,
-    dragMode:        false,
-    removalMode:     false,
-    cutPolygon:      false
-  });
+  // Geoman toolbar not shown — all drawing is triggered via postMessage
 
   // 2. Add the layers control
   const baseMaps = {
