@@ -181,8 +181,9 @@ function initMap() {
 
   const ortos2021 = L.tileLayer.wms('https://ide.ccdr-n.pt/wmsproxy/wms?', {
     layers: 'ortos2021_rn',
-    format: 'image/png',
+    format: 'image/jpeg',
     transparent: false,
+    version: '1.3.0',
     crs: L.CRS.EPSG3857,
     attribution: 'Ortos 2021 RN &copy; CCDR-N'
   });
