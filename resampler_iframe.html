@@ -2,32 +2,11 @@
 <html>
 <head><meta charset="UTF-8"></head>
 <body>
-<canvas id="c"></canvas>
 <script>
-/**
- * Image Resampler iframe
- *
- * RECEIVE (parent → iframe):
- *   Iframe1.postMessage({
- *     type:    'resample',
- *     image:   '<base64 data URL>',   // e.g. 'data:image/png;base64,...'
- *     scale:   0.5,                   // 0 < scale <= 1  (e.g. 0.2 = 20%)
- *     quality: 0.9,                   // optional, 0–1, for jpeg/webp (default 0.92)
- *     format:  'image/jpeg',          // optional output mime (default: same as input)
- *     id:      'any-string'           // echoed back for promise correlation
- *   })
- *
- * SEND (iframe → parent via onMessageReceived):
- *   { type: 'resample-result', id, image, originalWidth, originalHeight,
- *     newWidth, newHeight, originalSize, newSize }
- *
- *   { type: 'resample-error', id, error }
- */
-
-const canvas = document.getElementById('c');
+const canvas = new OffscreenCanvas(1, 1);
 const ctx    = canvas.getContext('2d');
 
-window.addEventListener('message', (event) => {
+window.addEventListener('message', async (event) => {
   const msg = event.data;
   if (!msg || msg.type !== 'resample') return;
 
@@ -40,40 +19,48 @@ window.addEventListener('message', (event) => {
     return reply({ type: 'resample-error', id, error: 'scale must be a number between 0 (exclusive) and 1 (inclusive)' });
   }
 
-  const img = new Image();
+  try {
+    const blob   = await fetch(image).then(r => r.blob());
+    const bitmap = await createImageBitmap(blob);
 
-  img.onload = () => {
-    const newW = Math.max(1, Math.round(img.naturalWidth  * scale));
-    const newH = Math.max(1, Math.round(img.naturalHeight * scale));
+    const newW = Math.max(1, Math.round(bitmap.width  * scale));
+    const newH = Math.max(1, Math.round(bitmap.height * scale));
 
     canvas.width  = newW;
     canvas.height = newH;
     ctx.clearRect(0, 0, newW, newH);
-    ctx.drawImage(img, 0, 0, newW, newH);
+    ctx.drawImage(bitmap, 0, 0, newW, newH);
+    bitmap.close();
 
     const srcMime   = image.match(/^data:([^;]+);/)?.[1] ?? 'image/png';
     const outFormat = format ?? srcMime;
-    const outImage  = canvas.toDataURL(outFormat, quality);
+    const outBlob   = await canvas.convertToBlob({ type: outFormat, quality });
+    const outImage  = await blobToDataURL(outBlob);
 
     reply({
       type:           'resample-result',
       id,
       image:          outImage,
-      originalWidth:  img.naturalWidth,
-      originalHeight: img.naturalHeight,
+      originalWidth:  bitmap.width,
+      originalHeight: bitmap.height,
       newWidth:       newW,
       newHeight:      newH,
       originalSize:   image.length,
       newSize:        outImage.length
     });
-  };
-
-  img.onerror = () => {
-    reply({ type: 'resample-error', id, error: 'Failed to decode image' });
-  };
-
-  img.src = image;
+  } catch (e) {
+    reply({ type: 'resample-error', id, error: e.message });
+  }
 });
+
+function blobToDataURL(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload  = () => resolve(reader.result);
+    reader.onerror = () => reject(new Error('Failed to convert blob to data URL'));
+    reader.readAsDataURL(blob);
+  });
+}
 
 function reply(data) {
   window.parent.postMessage(data, '*');
