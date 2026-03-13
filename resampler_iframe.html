@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"></head>
+<body>
+<canvas id="c"></canvas>
+<script>
+/**
+ * Image Resampler iframe
+ *
+ * RECEIVE (parent → iframe):
+ *   Iframe1.postMessage({
+ *     type:    'resample',
+ *     image:   '<base64 data URL>',   // e.g. 'data:image/png;base64,...'
+ *     scale:   0.5,                   // 0 < scale <= 1  (e.g. 0.2 = 20%)
+ *     quality: 0.9,                   // optional, 0–1, for jpeg/webp (default 0.92)
+ *     format:  'image/jpeg',          // optional output mime (default: same as input)
+ *     id:      'any-string'           // echoed back for promise correlation
+ *   })
+ *
+ * SEND (iframe → parent via onMessageReceived):
+ *   { type: 'resample-result', id, image, originalWidth, originalHeight,
+ *     newWidth, newHeight, originalSize, newSize }
+ *
+ *   { type: 'resample-error', id, error }
+ */
+
+const canvas = document.getElementById('c');
+const ctx    = canvas.getContext('2d');
+
+window.addEventListener('message', (event) => {
+  const msg = event.data;
+  if (!msg || msg.type !== 'resample') return;
+
+  const { image, scale = 0.5, quality = 0.92, format, id } = msg;
+
+  if (!image || typeof image !== 'string') {
+    return reply({ type: 'resample-error', id, error: 'Missing or invalid image field' });
+  }
+  if (typeof scale !== 'number' || scale <= 0 || scale > 1) {
+    return reply({ type: 'resample-error', id, error: 'scale must be a number between 0 (exclusive) and 1 (inclusive)' });
+  }
+
+  const img = new Image();
+
+  img.onload = () => {
+    const newW = Math.max(1, Math.round(img.naturalWidth  * scale));
+    const newH = Math.max(1, Math.round(img.naturalHeight * scale));
+
+    canvas.width  = newW;
+    canvas.height = newH;
+    ctx.clearRect(0, 0, newW, newH);
+    ctx.drawImage(img, 0, 0, newW, newH);
+
+    const srcMime   = image.match(/^data:([^;]+);/)?.[1] ?? 'image/png';
+    const outFormat = format ?? srcMime;
+    const outImage  = canvas.toDataURL(outFormat, quality);
+
+    reply({
+      type:           'resample-result',
+      id,
+      image:          outImage,
+      originalWidth:  img.naturalWidth,
+      originalHeight: img.naturalHeight,
+      newWidth:       newW,
+      newHeight:      newH,
+      originalSize:   image.length,
+      newSize:        outImage.length
+    });
+  };
+
+  img.onerror = () => {
+    reply({ type: 'resample-error', id, error: 'Failed to decode image' });
+  };
+
+  img.src = image;
+});
+
+function reply(data) {
+  window.parent.postMessage(data, '*');
+}
+</script>
+</body>
+</html>
