@@ -353,6 +353,12 @@ window.addEventListener('message', function(e) {
       }
       break;
 
+    case 'getFeatureCount':
+      const ptCount   = pointLayer.getLayers().length;
+      const polyCount = polygonLayer.getLayers().length;
+      const total     = ptCount + polyCount;
+      send({ action: 'feature:count', points: ptCount, polygons: polyCount });
+      break;
 
     case 'zoomTo:feature': {
       const id = data.id;
