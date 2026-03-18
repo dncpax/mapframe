@@ -358,7 +358,7 @@ window.addEventListener('message', function(e) {
       if (data.fit) {
         editableGroup.getBounds().isValid() && map.fitBounds(editableGroup.getBounds(), { padding: [40,40] });
       }
-      send(contaFeatures());
+      send({...contaFeatures(), action: 'feature:count'});
       break;
 
     case 'getFeatureCount':
@@ -366,7 +366,7 @@ window.addEventListener('message', function(e) {
       const polyCount = polygonLayer.getLayers().length;
       const total     = ptCount + polyCount;
       //send({ action: 'feature:count', points: ptCount, polygons: polyCount });
-      send(contaFeatures());
+      send({...contaFeatures(), action: 'feature:count'});
       break;
 
     case 'zoomTo:feature': {
