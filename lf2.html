@@ -322,6 +322,13 @@ function debounceSendGeometry() {
   }, DEBOUNCE_MS);
 }
 
+function contaFeatures() {
+  const ptCount   = pointLayer.getLayers().length;
+  const polyCount = polygonLayer.getLayers().length;
+  const total     = ptCount + polyCount;
+  return { points: ptCount, polygons: polyCount, total };
+}
+
 // ────────────────────────────────────────────────
 function send(msg) {
   // Very important: target real parent origin in production!
@@ -351,13 +358,15 @@ window.addEventListener('message', function(e) {
       if (data.fit) {
         editableGroup.getBounds().isValid() && map.fitBounds(editableGroup.getBounds(), { padding: [40,40] });
       }
+      send(contaFeatures());
       break;
 
     case 'getFeatureCount':
       const ptCount   = pointLayer.getLayers().length;
       const polyCount = polygonLayer.getLayers().length;
       const total     = ptCount + polyCount;
-      send({ action: 'feature:count', points: ptCount, polygons: polyCount });
+      //send({ action: 'feature:count', points: ptCount, polygons: polyCount });
+      send(contaFeatures());
       break;
 
     case 'zoomTo:feature': {
