@@ -192,7 +192,7 @@ function initMap() {
     center: [39,-7.8],
     zoom: 8,
     pmIgnore: false,   // important for Geoman
-    layers: [osm]      // Set the default basemap
+    layers: [ortos2021]      // Set the default basemap
   });
 
   editableGroup.addTo(map);
@@ -211,9 +211,9 @@ function initMap() {
 
   // 2. Add the layers control
   const baseMaps = {
-    "Ortos 2021 RN": ortos2021,
     "Street Map": osm,
-    "Aerial ESRI": aerial
+    "Aerial ESRI": aerial,
+    "Ortos 2021 RN": ortos2021
   };
   L.control.layers(baseMaps).addTo(map);
 
