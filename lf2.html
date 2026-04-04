@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
         crossorigin=""/>
   <link rel="stylesheet" href="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.css"/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css"/>
 
   <style>
     html, body, #map { height: 100%; margin: 0; padding: 0; }
@@ -25,6 +26,17 @@
       display: none; pointer-events: none;
     }
 
+    .leaflet-control-geocoder-icon {
+      filter: grayscale(1);
+    }
+    .leaflet-touch .leaflet-control-geocoder-icon {
+      width: 44px;
+      height: 44px;
+    }
+    .leaflet-container {
+      line-height: 1.75;
+    }
+
     /*mapa*/
     .feature-locked {
       opacity: 0.35 !important;
@@ -39,6 +51,7 @@
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.min.js"></script>
+<script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
 
 <script>
 // ────────────────────────────────────────────────
@@ -171,12 +184,15 @@ function initMap() {
   
 
   // 1. Define the basemaps
-  const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '&copy; OpenStreetMap'
+  const voyager = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+    subdomains: 'abcd',
+    maxZoom: 20
   });
 
   const aerial = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-    attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+    attribution: 'Tiles &copy; Esri',
+    maxZoom: 19
   });
 
   const ortos2021 = L.tileLayer.wms('https://ide.ccdr-n.pt/wmsproxy/wms?', {
@@ -188,11 +204,19 @@ function initMap() {
     attribution: 'Ortos 2021 RN &copy; CCDR-N'
   });
 
+  // Labels-only overlay (for combining with aerial/ortos)
+  const labels = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}{r}.png', {
+    attribution: '&copy; <a href="https://carto.com/attributions">CARTO</a>',
+    subdomains: 'abcd',
+    maxZoom: 20,
+    pane: 'overlayPane'
+  });
+
   map = L.map('map', {
     center: [41.5,-7.8],
     zoom: 8,
     pmIgnore: false,   // important for Geoman
-    layers: [ortos2021]      // Set the default basemap
+    layers: [ortos2021, labels]      // Set the default basemap + labels
   });
 
   editableGroup.addTo(map);
@@ -211,11 +235,26 @@ function initMap() {
 
   // 2. Add the layers control
   const baseMaps = {
-    "Street Map": osm,
+    "CartoDB Voyager (sem labels)": voyager,
     "Aerial ESRI": aerial,
     "Ortos 2021 RN": ortos2021
   };
-  L.control.layers(baseMaps).addTo(map);
+  const overlays = {
+    "Labels": labels
+  };
+  L.control.layers(baseMaps, overlays).addTo(map);
+
+  // Geocoder (Photon - OSM-based, no rate-limit issues)
+  L.Control.geocoder({
+    defaultMarkGeocode: false,
+    placeholder: 'Pesquisar...',
+    geocoder: L.Control.Geocoder.photon({ geocodingQueryParams: { lang: 'pt' } })
+  })
+    .on('markgeocode', function(e) {
+      const bbox = e.geocode.bbox;
+      map.fitBounds(bbox, { padding: [40, 40], maxZoom: 17 });
+    })
+    .addTo(map);
 
   // ── Listen for geometry changes ──────────────────────────────
   editLayer.on('pm:dragend pm:markerdragend pm:vertex:changed', debounceSendGeometry);
