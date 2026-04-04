@@ -212,11 +212,23 @@ function initMap() {
     pane: 'overlayPane'
   });
 
+  // NUTS2 boundaries (always visible)
+  const nuts2 = L.tileLayer.wms('https://geo2.dgterritorio.gov.pt/geoserver/caop_continente/wms?', {
+    layers: 'cont_nuts2',
+    format: 'image/png',
+    transparent: true,
+    version: '1.3.0',
+    crs: L.CRS.EPSG3857,
+    attribution: 'CAOP &copy; DGTerritório',
+    pane: 'overlayPane'
+  });
+
   map = L.map('map', {
     center: [41.5,-7.8],
     zoom: 8,
     pmIgnore: false,   // important for Geoman
-    layers: [ortos2021, labels]      // Set the default basemap + labels
+    maxZoom: 18,       // match ortos2021 WMS max zoom
+    layers: [ortos2021, labels, nuts2]      // Set the default basemap + labels + NUTS2
   });
 
   editableGroup.addTo(map);
@@ -244,11 +256,16 @@ function initMap() {
   };
   L.control.layers(baseMaps, overlays).addTo(map);
 
-  // Geocoder (Photon - OSM-based, no rate-limit issues)
+  // Geocoder (Photon - bounded to Portugal, 7 results max)
   L.Control.geocoder({
     defaultMarkGeocode: false,
     placeholder: 'Pesquisar...',
-    geocoder: L.Control.Geocoder.photon({ geocodingQueryParams: { lang: 'pt' } })
+    geocoder: L.Control.Geocoder.photon({
+      geocodingQueryParams: {
+        bbox: '-9.5,36.9,-6.1,42.2',
+        limit: 7
+      }
+    })
   })
     .on('markgeocode', function(e) {
       const bbox = e.geocode.bbox;
